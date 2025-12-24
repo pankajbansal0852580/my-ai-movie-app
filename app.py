@@ -1,46 +1,43 @@
 import streamlit as st
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-st.set_page_config(page_title="AI Movie Recommender", layout="wide")
-
-st.title("🎬 Premium Movie Recommender")
-st.markdown("---")
+st.set_page_config(page_title="Pro AI Recommender", layout="wide")
+st.title("🚀 Advanced AI Movie Engine")
 
 @st.cache_data
 def load_data():
-    # Using the same reliable dataset
     url = "https://raw.githubusercontent.com/YBI-Foundation/Dataset/main/Movies%20Recommendation.csv"
-    data = pd.read_csv(url)
-    return data
+    df = pd.read_csv(url)
+    # Fill any empty descriptions to avoid errors
+    df['Movie_Genre'] = df['Movie_Genre'].fillna('')
+    return df
 
 df = load_data()
 
-# Sidebar Setup
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/2503/2503508.png", width=100)
-st.sidebar.title("Settings")
-selected_movie = st.sidebar.selectbox("Type or select a movie:", df['Movie_Title'].unique())
+# --- THE AI PART ---
+# This converts movie genres into numbers so the computer can 'calculate' similarity
+tfidf = TfidfVectorizer(stop_words='english')
+tfidf_matrix = tfidf.fit_transform(df['Movie_Genre'])
+cosine_sim = cosine_similarity(tfidf_matrix, tfidf_matrix)
+# --------------------
 
-# Logic: Find the Genre and Recommendations
-movie_row = df[df['Movie_Title'] == selected_movie].iloc[0]
-genre = movie_row['Movie_Genre']
-recommendations = df[df['Movie_Genre'] == genre].head(6)
+selected_movie = st.sidebar.selectbox("Select a movie:", df['Movie_Title'].unique())
 
-st.subheader(f"Because you liked '{selected_movie}'")
-st.caption(f"Category: {genre}")
+def get_recommendations(title):
+    idx = df[df['Movie_Title'] == title].index[0]
+    sim_scores = list(enumerate(cosine_sim[idx]))
+    sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+    movie_indices = [i[0] for i in sim_scores[1:6]]
+    return df.iloc[movie_indices]
 
-# 2. The Visual Gallery
+st.subheader(f"AI suggests these based on '{selected_movie}':")
+recs = get_recommendations(selected_movie)
+
 cols = st.columns(5)
-
-# We loop through the recommendations (skipping the one already selected)
-recommended_list = recommendations[recommendations['Movie_Title'] != selected_movie].head(5)
-
-for i, (index, row) in enumerate(recommended_list.iterrows()):
+for i, (index, row) in enumerate(recs.iterrows()):
     with cols[i]:
-        # Placeholder for now
-        poster_url = "https://via.placeholder.com/500x750?text=Movie"
-        
-        st.image(poster_url, use_container_width=True)
+        st.image("https://via.placeholder.com/500x750?text=Movie", use_container_width=True)
         st.write(f"**{row['Movie_Title']}**")
-        
-        # We changed 'Movie_Rating' to 'Movie_Genre' or 'Movie_Language' to avoid the error
-        st.caption(f"Language: {row['Movie_Language']}")
+        st.caption(f"Match Score: {round(row['Movie_Popularity']/10, 1)}/10")
